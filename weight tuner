@@ -7,6 +7,8 @@
 #define DEC_POINT  2
 #define STABLE  1
 
+float zero_factor = 0;
+
 float offset = 0;
 float calibration_factor = 1;
 float real_weight = 4; //kg
