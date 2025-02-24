@@ -1,0 +1,68 @@
+
+#include <Wire.h>
+#include <VL53L0X.h>
+
+VL53L0X sensor;
+
+
+//#include <LiquidCrystal_I2C.h>
+// Set the LCD address to 0x27 for a 16 chars and 2 line display
+//LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+const int type = 1;// 1=mm , 2= cm
+String unit;// variable for unit, mm or cm
+void setup()
+{
+
+  Serial.begin(9600);
+  Wire.begin();
+
+  sensor.init();
+  sensor.setTimeout(500);
+
+  // Start continuous back-to-back mode (take readings as
+  // fast as possible).  To use continuous timed mode
+  // instead, provide a desired inter-measurement period in
+  // ms (e.g. sensor.startContinuous(100)).
+  sensor.startContinuous();
+  
+  // initialize the LCD, 
+//  lcd.begin();
+  // Turn on the blacklight and print a message.
+//  lcd.backlight(); 
+}
+
+void loop()
+{
+  int distance =sensor.readRangeContinuousMillimeters();
+  //int distance =sensor.startContinuous(100);
+
+ //distance = distance;
+  Serial.print("Distance: ");
+
+  //start of loop Robojax code for LCD with I2C
+//  lcd.clear();
+//  lcd.print("Robojax VL53L0X");
+//  lcd.setCursor (0,1); // go to start of 2nd line
+//  lcd.print("Dist.: ");
+//  lcd.setCursor (7,1); // go to start of 2nd line
+  if(type ==2){
+    float distanceCM = (float) (distance/10.0);
+      unit ="cm";
+//      lcd.print(distanceCM);
+      Serial.print(distanceCM);
+      Serial.print(unit);      
+    }else{
+    unit ="mm";
+//      lcd.print(distance);
+      Serial.print(distance);
+      Serial.print(unit);       
+    }  
+
+//  lcd.print(unit);    
+  
+  if (sensor.timeoutOccurred()) { Serial.print(" TIMEOUT"); }
+
+  Serial.println();
+  delay(100);
+} 
