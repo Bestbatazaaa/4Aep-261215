@@ -63,7 +63,9 @@ void messageReceived(String &topic, String &payload) {
           Serial.println("VolumeAfter has changed");
           Dataafter = volume;
       }
-      m = payload.toFloat();
+//     if (topic == "4ape/Mass1"){
+//        m = payload.toFloat();
+//      }
 }
 
 void setup() {
@@ -178,6 +180,8 @@ void loop() {
     Serial.println(" N");
     }
     client.publish("4ape/Mass1", String(m).c_str());
+    client.publish("4ape/VolumeBefore", String(Databefore).c_str());
+    client.publish("4ape/VolumeAfter", String(Dataafter).c_str());
 
     delay(300);   // Update every 1 second
 
