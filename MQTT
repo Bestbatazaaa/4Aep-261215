@@ -57,14 +57,13 @@ void connect() {
 void messageReceived(String &topic, String &payload) {
   Serial.println("incoming: " + topic + " - " + payload);
       if (payload == "VolumeBefore") {
-          Databefore = payload.toFloat();
-          Databefore = 10;      
+          Databefore = volume;      
           }
       if (payload == "VolumeAfter") {  // Fix indentation for better readability
           Serial.println("VolumeAfter has changed");
-          Dataafter = payload.toFloat();
-          Dataafter = 11;
+          Dataafter = volume;
       }
+      m = payload.toFloat();
 }
 
 void setup() {
@@ -87,7 +86,7 @@ void setup() {
 
 void loop() {
 
-  Serial.println(Dataafter);
+  Serial.println(m);
   client.loop();
   delay(10);  // <- fixes some issues with WiFi stability
 
@@ -178,7 +177,7 @@ void loop() {
     Serial.print(buoyant);
     Serial.println(" N");
     }
-
+    client.publish("4ape/Mass1", String(m).c_str());
 
     delay(300);   // Update every 1 second
 
