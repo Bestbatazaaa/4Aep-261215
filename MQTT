@@ -56,14 +56,15 @@ void connect() {
 
 void messageReceived(String &topic, String &payload) {
   Serial.println("incoming: " + topic + " - " + payload);
-    if (topic == mqtt_topic) {
-      if (payload == "on") {
-          digitalWrite(LED, HIGH);
-          Serial.println("LED turned ON");
-      } else if (payload == "off") {
-          digitalWrite(LED, LOW);
-          Serial.println("LED turned OFF");
-    }
+      if (payload == "VolumeBefore") {
+          Databefore = payload.toFloat();
+          Databefore = 10;      
+          }
+      if (payload == "VolumeAfter") {  // Fix indentation for better readability
+          Serial.println("VolumeAfter has changed");
+          Dataafter = payload.toFloat();
+          Dataafter = 11;
+      }
 }
 
 void setup() {
@@ -85,6 +86,8 @@ void setup() {
 }
 
 void loop() {
+
+  Serial.println(Dataafter);
   client.loop();
   delay(10);  // <- fixes some issues with WiFi stability
 
