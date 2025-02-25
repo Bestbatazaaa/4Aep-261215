@@ -1,0 +1,119 @@
+#include <LCD_I2C.h>
+
+LCD_I2C lcd(0x27, 20, 4);  // Set LCD address and size
+#define Button 33
+
+const int pingPin = 13;     // Trigger pin of the ultrasonic sensor
+const int inPin = 12;       // Echo pin of the ultrasonic sensor
+long duration;
+float cm;     //distance of thing
+float Waterheight;
+float volume;
+float Databefore;
+float Dataafter;
+float endVolume;
+int count = 0;
+float density;
+float m;
+float buoyant;
+
+float ProtoArea = 28.2*19.6;   //set area of tank
+float Protoheight = 18.1;
+
+void setup()
+{
+    Serial.begin(9600);   // Start serial communication for debugging
+    lcd.begin();          // Initialize the LCD
+    lcd.backlight();      // Turn on the backlight of the LCD
+    pinMode(pingPin, OUTPUT);   // Set pingPin as output
+    pinMode(inPin, INPUT);      // Set inPin as input
+    pinMode(Button, INPUT);  // Set buttonpin as in output
+}
+
+void loop()
+{
+    if (Serial.available() > 0){
+      String input = Serial.readStringUntil('\n'); // อ่านค่าจนกว่าจะพบ '\n'
+      m = input.toFloat();
+      Serial.print("mass: ");
+      Serial.print(m);
+      Serial.println(" kg");
+    }
+
+
+    // Send a 10us pulse to trigger the ultrasonic sensor
+    digitalWrite(pingPin, LOW);
+    delayMicroseconds(2);
+    digitalWrite(pingPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(pingPin, LOW);
+
+    // Read the duration of the pulse from the Echo pin
+    duration = pulseIn(inPin, HIGH);
+
+    // Calculate the distance in cm (converted to float)
+    cm = duration / 29.0 / 2.0;  // Speed of sound is 343 m/s, 29 microseconds per cm
+    Waterheight = Protoheight - cm;
+    volume = Waterheight * ProtoArea;
+  
+    if( digitalRead(Button) == HIGH )
+    {
+      count++;
+      if ( count == 1)
+      {
+      Databefore = volume;
+      } else if ( count == 2)
+      {
+      Dataafter = volume;
+      } 
+      else
+      {
+      count = 0;
+      Databefore=0;
+      Dataafter=0;
+      }
+    }    
+    endVolume =  Dataafter-Databefore ;
+
+    density = m*1000/(endVolume/1000);
+
+    buoyant = (density/1000) * (endVolume/1000) * 9.81;
+    
+
+    // Display the result on the LCD
+    lcd.clear();               
+    lcd.setCursor(0, 0);       
+    lcd.print("mass: ");
+    lcd.setCursor(10, 0);     
+    lcd.print(m, 2);
+    lcd.print(" kg");
+    // show height
+    lcd.setCursor(0, 1);      
+    lcd.print("W.Height: ");
+    lcd.setCursor(12, 1);
+    lcd.print(Waterheight, 2);
+    lcd.print(" ");
+     // show volume
+    lcd.setCursor(0, 2);       
+    lcd.print("Volume: ");
+    lcd.setCursor(8, 2);
+    lcd.print(volume, 2);          
+    //lcd.print(" C.C.");
+    // final volume
+    lcd.setCursor(0, 3);       
+    lcd.print("obj.Volume: ");
+    lcd.setCursor(12,3 );
+    lcd.print(endVolume, 2);          
+    //lcd.print(" C.C.");
+    if( endVolume > 0 ){
+    Serial.print("density :");
+    Serial.print(density);
+    Serial.println(" kg/m^3");
+    Serial.print("buoyant force :");
+    Serial.print(buoyant);
+    Serial.println(" N");
+    }
+
+
+    delay(300);   // Update every 1 second
+}
