@@ -15,9 +15,9 @@ float Databefore;
 float Dataafter;
 float endVolume;
 int count = 0;
-float density;
+float density = 0;
 float m;
-float buoyant;
+float buoyant = 0;
 
 float ProtoArea = 28.2*19.6;   //set area of tank
 float Protoheight = 18.1;
@@ -27,6 +27,7 @@ const char pass[] = "Best1234";
 
 const char mqtt_broker[]="test.mosquitto.org";
 const char mqtt_topic[]="4ape/#";
+const char mqtt_topic2[]="AmazingMass/#";
 const char mqtt_client_id[]="clientId-RFySrse90v"; // must change this string to a unique value
 int MQTT_PORT=1883;
 
@@ -51,11 +52,17 @@ void connect() {
   Serial.println("\nconnected!");
 
   client.subscribe(mqtt_topic);
+  client.subscribe(mqtt_topic2);
+
   // client.unsubscribe("/hello");
 }
 
 void messageReceived(String &topic, String &payload) {
   Serial.println("incoming: " + topic + " - " + payload);
+      if (payload == "Reset") {
+          Databefore = 0;
+          Dataafter = 0;
+          }
       if (payload == "VolumeBefore") {
           Databefore = volume;      
           }
@@ -63,9 +70,9 @@ void messageReceived(String &topic, String &payload) {
           Serial.println("VolumeAfter has changed");
           Dataafter = volume;
       }
-//     if (topic == "4ape/Mass1"){
-//        m = payload.toFloat();
-//      }
+
+      m = payload.toFloat();
+
 }
 
 void setup() {
@@ -101,9 +108,9 @@ void loop() {
     if (Serial.available() > 0){
       String input = Serial.readStringUntil('\n'); // อ่านค่าจนกว่าจะพบ '\n'
       m = input.toFloat();
-      Serial.print("mass: ");
-      Serial.print(m);
-      Serial.println(" kg");
+      // Serial.print("mass: ");
+      // Serial.print(m);
+      // Serial.println(" kg");
     }
 
 
@@ -143,7 +150,7 @@ void loop() {
 
     density = m*1000/(endVolume/1000);
 
-    buoyant = (density/1000) * (endVolume/1000) * 9.81;
+    buoyant = (1000/1000) * (endVolume/1000) * 9.81;
     
 
     // Display the result on the LCD
@@ -171,17 +178,20 @@ void loop() {
     lcd.setCursor(12,3 );
     lcd.print(endVolume, 2);          
     //lcd.print(" C.C.");
-    if( endVolume > 0 ){
-    Serial.print("density :");
-    Serial.print(density);
-    Serial.println(" kg/m^3");
-    Serial.print("buoyant force :");
-    Serial.print(buoyant);
-    Serial.println(" N");
-    }
-    client.publish("4ape/Mass1", String(m).c_str());
-    client.publish("4ape/VolumeBefore", String(Databefore).c_str());
-    client.publish("4ape/VolumeAfter", String(Dataafter).c_str());
+    // if( endVolume > 0 ){
+    // Serial.print("density :");
+    // Serial.print(density);
+    // Serial.println(" kg/m^3");
+    // Serial.print("buoyant force :");
+    // Serial.print(buoyant);
+    // Serial.println(" N");
+    // }
+    client.publish("2ape/Mass1", String(m).c_str());
+    client.publish("2ape/VolumeBefore", String(Databefore).c_str());
+    client.publish("2ape/VolumeAfter", String(Dataafter).c_str());
+    client.publish("2ape/Waterheight", String(Waterheight).c_str());
+    client.publish("2ape/density", String(density).c_str());
+    client.publish("2ape/buoyant", String(buoyant).c_str());
 
     delay(300);   // Update every 1 second
 
