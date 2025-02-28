@@ -1,0 +1,44 @@
+#define PUL 18  // ขา Pulse
+#define DIR 19  // ขา Direction
+#define ENA 21  // ขา Enable (ถ้ามี)
+
+#define WATER_SENSOR 32  // ใช้ GPIO 32 เป็นขาอ่านค่าน้ำ
+#define THRESHOLD 1000   // ปรับค่าตามสภาพแวดล้อม (ESP32 ADC 12-bit 0-4095)
+
+void setup() {
+  pinMode(PUL, OUTPUT);
+  pinMode(DIR, OUTPUT);
+  pinMode(ENA, OUTPUT);
+
+  digitalWrite(ENA, LOW);  // เปิดการทำงานไดร์เวอร์
+  digitalWrite(DIR, HIGH); // ตั้งทิศทางหมุน
+
+  Serial.begin(115200);  // ESP32 รองรับบอดเรทสูง ใช้ 115200
+}
+
+void loop() {
+  int waterLevel = analogRead(WATER_SENSOR); // อ่านค่าจากเซ็นเซอร์ (0 - 4095)
+
+  // แสดงค่าระดับน้ำใน Serial Monitor
+  Serial.print("Water Level: ");
+  Serial.println(waterLevel);
+
+  // ทำงานใน while loop จนกว่าระดับน้ำจะเปลี่ยน
+  while (waterLevel > THRESHOLD) {
+    Serial.println("Water detected! Stopping motor.");
+    digitalWrite(ENA, HIGH);  // ปิดมอเตอร์เมื่อเจอน้ำ
+    waterLevel = analogRead(WATER_SENSOR); // ตรวจสอบค่าระดับน้ำใหม่
+  }
+
+  // เมื่อไม่มีน้ำ
+  while (waterLevel <= THRESHOLD) {
+    Serial.println("No water detected. Running motor.");
+    digitalWrite(ENA, LOW);   // เปิดมอเตอร์เมื่อไม่เจอน้ำ
+    digitalWrite(PUL, HIGH);
+    delayMicroseconds(500);
+    digitalWrite(PUL, LOW);
+    delayMicroseconds(500);
+
+    waterLevel = analogRead(WATER_SENSOR); // ตรวจสอบค่าระดับน้ำใหม่
+  }
+}
