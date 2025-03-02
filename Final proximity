@@ -1,0 +1,56 @@
+#include <Wire.h>
+#include <VL53L0X.h>
+
+VL53L0X sensor;
+
+const int numReadings = 5;
+int readings[numReadings];  // Array to store readings
+int readIndex = 0;
+int total = 0;
+int average = 0;
+
+void setup() {
+  Serial.begin(9600);
+  Wire.begin();
+  sensor.init();
+  sensor.setTimeout(500);
+  sensor.startContinuous();
+
+  // Initialize readings array
+  for (int i = 0; i < numReadings; i++) {
+    readings[i] = 0;
+  }
+}
+
+
+void proximitySensor(){
+    float distance = sensor.readRangeContinuousMillimeters();
+  
+  if (sensor.timeoutOccurred()) {
+    Serial.println("TIMEOUT");
+    return;
+  }
+  
+  // Subtract the oldest reading from total
+  total -= readings[readIndex];
+  // Store the new reading
+  readings[readIndex] = distance;
+  // Add the new reading to total
+  total += readings[readIndex];
+  
+  // Advance index
+  readIndex = (readIndex + 1) % numReadings;
+  
+  // Calculate average
+  average = total / numReadings;
+
+  Serial.print("Average distance: ");
+  Serial.print(average); // Adjusting the offset as in the original code
+  Serial.println(" mm");
+}
+
+void loop() {
+ proximitySensor();
+
+  delay(500);
+}
