@@ -1,0 +1,270 @@
+#include <LCD_I2C.h>
+#include <WiFi.h>
+#include <MQTT.h>
+#include <Wire.h>
+#include <VL53L0X.h>
+
+LCD_I2C lcd(0x27, 20, 4);  // Set LCD address and size
+#define Button 33
+
+#define PUL 18  // ขา Pulse
+#define DIR 19  // ขา Direction
+#define ENA 5  // ขา Enable (ถ้ามี)
+
+#define WATER_SENSOR 32  // ใช้ GPIO 32 เป็นขาอ่านค่าน้ำ
+#define THRESHOLD 1000   // ปรับค่าตามสภาพแวดล้อม (ESP32 ADC 12-bit 0-4095)
+
+const int numReadings = 5; //proximity starrt
+int readings[numReadings];  // Array to store readings
+int readIndex = 0;
+int total = 0;
+int average = 0;  //proximity stop
+
+bool motor_state;
+bool motor_work;
+
+const int pingPin = 13;     // Trigger pin of the ultrasonic sensor
+const int inPin = 12;       // Echo pin of the ultrasonic sensor
+long duration;
+float cm;     //distance of thing
+float Waterheight;
+float volume;
+float Databefore;
+float Dataafter;
+float endVolume;
+int count = 0;
+float density = 0;
+float m;
+float buoyant = 0;
+int waterLevel;
+float distance;
+
+float ProtoArea = 28.2*19.6;   //set area of tank
+float Protoheight = 18.1;
+
+const char ssid[] = "Please";
+const char pass[] = "Best1234";
+
+const char mqtt_broker[]="test.mosquitto.org";
+const char mqtt_topic[]="4ape/#";
+const char mqtt_topic2[]="AmazingMass/#";
+const char mqtt_client_id[]="clientId-RFySrse90v"; // must change this string to a unique value
+int MQTT_PORT=1883;
+
+VL53L0X sensor;
+WiFiClient net;
+MQTTClient client;
+
+unsigned long lastMillis = 0;
+
+void connect() {
+  Serial.print("checking wifi...");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(1000);
+  }
+
+  Serial.print("\nconnecting...");
+  while (!client.connect(mqtt_client_id)) {  
+    Serial.print(".");
+    delay(1000);
+  }
+
+  Serial.println("\nconnected!");
+
+  client.subscribe(mqtt_topic);
+  client.subscribe(mqtt_topic2);
+
+  // client.unsubscribe("/hello");
+}
+
+void messageReceived(String &topic, String &payload) {
+  Serial.println("incoming: " + topic + " - " + payload);
+      if (payload == "Reset") {
+          Databefore = 0;
+          Dataafter = 0;
+          }
+      if (payload == "VolumeBefore") {
+          Databefore = volume;
+          }
+      if (payload == "VolumeAfter") {  // Fix indentation for better readability
+          Serial.println("VolumeAfter has changed");
+          Dataafter = volume;
+      }
+      if (payload == "start"){
+      motorOperate();
+      }
+      m = payload.toFloat();
+}
+
+
+void setup() {
+  Serial.begin(9600);
+  WiFi.begin(ssid, pass);
+  client.begin(mqtt_broker, MQTT_PORT, net);
+  client.onMessage(messageReceived);
+
+  connect();
+
+//--------------------------------------------------------------------
+
+    lcd.begin();          // Initialize the LCD
+    lcd.backlight();      // Turn on the backlight of the LCD
+    pinMode(pingPin, OUTPUT);   // Set pingPin as output
+    pinMode(inPin, INPUT);      // Set inPin as input
+    pinMode(Button, INPUT);  // Set buttonpin as in output
+    pinMode(PUL, OUTPUT);
+    pinMode(DIR, OUTPUT);
+    pinMode(ENA, OUTPUT);
+    digitalWrite(DIR, HIGH); // ตั้งทิศทางหมุน
+}
+
+void publishData() {
+  client.publish("2ape/Mass1", String(m).c_str());
+  client.publish("2ape/VolumeBefore", String(Databefore).c_str());
+  client.publish("2ape/VolumeAfter", String(Dataafter).c_str());
+  client.publish("2ape/Waterheight", String(Waterheight).c_str());
+  client.publish("2ape/density", String(density).c_str());
+  client.publish("2ape/buoyant", String(buoyant).c_str());
+}
+
+void displayMass(){
+    lcd.clear();               
+    lcd.setCursor(0, 0);       
+    lcd.print("mass: ");
+    lcd.setCursor(10, 0);     
+    lcd.print(m, 2);
+    lcd.print(" kg");
+}
+
+void displayWaterheight(){
+    lcd.setCursor(0, 1);      
+    lcd.print("W.Height: ");
+    lcd.setCursor(12, 1);
+    lcd.print(Waterheight, 2);
+    lcd.print(" ");
+}
+
+void displayVolume(){
+    lcd.setCursor(0, 2);       
+    lcd.print("Volume: ");
+    lcd.setCursor(8, 2);
+    lcd.print(volume, 2);      
+}
+
+void displayObjVolume(){
+    lcd.setCursor(0, 3);       
+    lcd.print("obj.Volume: ");
+    lcd.setCursor(12,3 );
+    lcd.print(endVolume, 2);   
+}
+
+void motorOperate(){
+        while (waterLevel <= THRESHOLD) {
+          waterLevel = analogRead(WATER_SENSOR); // ตรวจสอบค่าระดับน้ำใหม่
+          Serial.println("No water detected. Running motor.");
+          digitalWrite(ENA, LOW);   // เปิดมอเตอร์เมื่อไม่เจอน้ำ
+          digitalWrite(PUL, HIGH);
+          delayMicroseconds(500);
+          digitalWrite(PUL, LOW);
+          delayMicroseconds(500);
+        }
+        Serial.println("Water detected Motor stopped");
+}
+
+void proximitySensor(){
+    distance = sensor.readRangeContinuousMillimeters();
+  
+  if (sensor.timeoutOccurred()) {
+    Serial.println("TIMEOUT");
+    return;
+  }
+  
+  // Subtract the oldest reading from total
+  total -= readings[readIndex];
+  // Store the new reading
+  readings[readIndex] = distance;
+  // Add the new reading to total
+  total += readings[readIndex];
+  
+  // Advance index
+  readIndex = (readIndex + 1) % numReadings;
+  
+  // Calculate average
+  average = total / numReadings;
+
+  Serial.print("Average distance: ");
+  Serial.print(average); // Adjusting the offset as in the original code
+  Serial.println(" mm");
+}
+
+void loop() {
+
+  Serial.println(m);
+  client.loop();
+  delay(10);  // <- fixes some issues with WiFi stability
+
+  if (!client.connected()) {
+    connect();
+  }
+
+//---------------------------------------------------------------------
+
+    if (Serial.available() > 0){
+      String input = Serial.readStringUntil('\n'); // อ่านค่าจนกว่าจะพบ '\n'
+      m = input.toFloat();
+      // Serial.print("mass: ");
+      // Serial.print(m);
+      // Serial.println(" kg");
+    }
+    
+    proximitySensor();
+
+    // Send a 10us pulse to trigger the ultrasonic sensor
+    //digitalWrite(pingPin, LOW);
+    //delayMicroseconds(2);
+    //digitalWrite(pingPin, HIGH);
+    //delayMicroseconds(10);
+    //digitalWrite(pingPin, LOW);
+
+    // Read the duration of the pulse from the Echo pin
+    //duration = pulseIn(inPin, HIGH);
+
+    // Calculate the distance in cm (converted to float)
+    //cm = duration / 29.0 / 2.0;  // Speed of sound is 343 m/s, 29 microseconds per cm
+    Waterheight = Protoheight - (distance/10);
+    volume = Waterheight * ProtoArea;
+  
+    if( digitalRead(Button) == HIGH ){
+          count++;
+        if ( count == 1){
+          Databefore = volume;
+      } else if ( count == 2) {
+          Dataafter = volume;
+      } else {
+          count = 0;
+          Databefore=0;
+          Dataafter=0;
+      }
+    }    
+    endVolume =  Dataafter-Databefore ;
+
+    density = m*1000/(endVolume/1000);
+
+    buoyant = (1000/1000) * (endVolume/1000) * 9.81;
+    
+
+    // Display the result on the LCD
+    displayMass();
+    // show height
+    displayWaterheight();
+     // show volume
+    displayVolume();      
+    // final volume
+    displayObjVolume();        
+    // publish data
+    publishData();
+
+    delay(300);   // Update every 1 second
+
+}
