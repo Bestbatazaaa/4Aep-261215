@@ -5,6 +5,16 @@
 LCD_I2C lcd(0x27, 20, 4);  // Set LCD address and size
 #define Button 33
 
+#define PUL 18  // ขา Pulse
+#define DIR 19  // ขา Direction
+#define ENA 5  // ขา Enable (ถ้ามี)
+
+#define WATER_SENSOR 32  // ใช้ GPIO 32 เป็นขาอ่านค่าน้ำ
+#define THRESHOLD 1000   // ปรับค่าตามสภาพแวดล้อม (ESP32 ADC 12-bit 0-4095)
+
+bool motor_state;
+bool motor_work;
+
 const int pingPin = 13;     // Trigger pin of the ultrasonic sensor
 const int inPin = 12;       // Echo pin of the ultrasonic sensor
 long duration;
@@ -18,6 +28,7 @@ int count = 0;
 float density = 0;
 float m;
 float buoyant = 0;
+int waterLevel;
 
 float ProtoArea = 28.2*19.6;   //set area of tank
 float Protoheight = 18.1;
@@ -64,16 +75,29 @@ void messageReceived(String &topic, String &payload) {
           Dataafter = 0;
           }
       if (payload == "VolumeBefore") {
-          Databefore = volume;      
+          Databefore = volume;
           }
       if (payload == "VolumeAfter") {  // Fix indentation for better readability
           Serial.println("VolumeAfter has changed");
           Dataafter = volume;
       }
-
+      if (payload == "start"){
+        while (waterLevel <= THRESHOLD) {
+          waterLevel = analogRead(WATER_SENSOR); // ตรวจสอบค่าระดับน้ำใหม่
+          Serial.println("No water detected. Running motor.");
+          digitalWrite(ENA, LOW);   // เปิดมอเตอร์เมื่อไม่เจอน้ำ
+          digitalWrite(PUL, HIGH);
+          delayMicroseconds(500);
+          digitalWrite(PUL, LOW);
+          delayMicroseconds(500);
+        }
+        Serial.println("Water detected Motor stopped");
+      }
+      
       m = payload.toFloat();
 
 }
+
 
 void setup() {
   Serial.begin(9600);
@@ -90,8 +114,30 @@ void setup() {
     pinMode(pingPin, OUTPUT);   // Set pingPin as output
     pinMode(inPin, INPUT);      // Set inPin as input
     pinMode(Button, INPUT);  // Set buttonpin as in output
-
+    pinMode(PUL, OUTPUT);
+    pinMode(DIR, OUTPUT);
+    pinMode(ENA, OUTPUT);
+    digitalWrite(DIR, HIGH); // ตั้งทิศทางหมุน
 }
+
+void publishData() {
+  client.publish("2ape/Mass1", String(m).c_str());
+  client.publish("2ape/VolumeBefore", String(Databefore).c_str());
+  client.publish("2ape/VolumeAfter", String(Dataafter).c_str());
+  client.publish("2ape/Waterheight", String(Waterheight).c_str());
+  client.publish("2ape/density", String(density).c_str());
+  client.publish("2ape/buoyant", String(buoyant).c_str());
+}
+
+void displayMass(){
+    lcd.clear();               
+    lcd.setCursor(0, 0);       
+    lcd.print("mass: ");
+    lcd.setCursor(10, 0);     
+    lcd.print(m, 2);
+    lcd.print(" kg");
+}
+
 
 void loop() {
 
@@ -112,7 +158,7 @@ void loop() {
       // Serial.print(m);
       // Serial.println(" kg");
     }
-
+    
 
     // Send a 10us pulse to trigger the ultrasonic sensor
     digitalWrite(pingPin, LOW);
@@ -171,27 +217,13 @@ void loop() {
     lcd.print("Volume: ");
     lcd.setCursor(8, 2);
     lcd.print(volume, 2);          
-    //lcd.print(" C.C.");
     // final volume
     lcd.setCursor(0, 3);       
     lcd.print("obj.Volume: ");
     lcd.setCursor(12,3 );
     lcd.print(endVolume, 2);          
-    //lcd.print(" C.C.");
-    // if( endVolume > 0 ){
-    // Serial.print("density :");
-    // Serial.print(density);
-    // Serial.println(" kg/m^3");
-    // Serial.print("buoyant force :");
-    // Serial.print(buoyant);
-    // Serial.println(" N");
-    // }
-    client.publish("2ape/Mass1", String(m).c_str());
-    client.publish("2ape/VolumeBefore", String(Databefore).c_str());
-    client.publish("2ape/VolumeAfter", String(Dataafter).c_str());
-    client.publish("2ape/Waterheight", String(Waterheight).c_str());
-    client.publish("2ape/density", String(density).c_str());
-    client.publish("2ape/buoyant", String(buoyant).c_str());
+
+    publishData();
 
     delay(300);   // Update every 1 second
 
